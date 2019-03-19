@@ -22,6 +22,9 @@ public class FingerprintAuthModule extends ReactContextBaseJavaModule implements
 
     private KeyguardManager keyguardManager;
     private boolean isAppActive;
+    private ReactApplicationContext context;
+    private DialogResultHandler drh;
+    final FingerprintDialog fingerprintDialog = new FingerprintDialog();
 
     public static boolean inProgress = false;
 
@@ -29,6 +32,7 @@ public class FingerprintAuthModule extends ReactContextBaseJavaModule implements
         super(reactContext);
 
         reactContext.addLifecycleEventListener(this);
+        context = reactContext;
     }
 
     private KeyguardManager getKeyguardManager() {
@@ -94,20 +98,29 @@ public class FingerprintAuthModule extends ReactContextBaseJavaModule implements
         // TODO: migrate to FingerprintManagerCompat
         final FingerprintManager.CryptoObject cryptoObject = new FingerprintManager.CryptoObject(cipher);
 
-        final DialogResultHandler drh = new DialogResultHandler(reactErrorCallback, reactSuccessCallback);
-
-        final FingerprintDialog fingerprintDialog = new FingerprintDialog();
-        fingerprintDialog.setCryptoObject(cryptoObject);
-        fingerprintDialog.setReasonForAuthentication(reason);
-        fingerprintDialog.setAuthConfig(authConfig);
-        fingerprintDialog.setDialogCallback(drh);
+        drh = new DialogResultHandler(reactErrorCallback, reactSuccessCallback, context);
 
         if (!isAppActive) {
             inProgress = false;
             return;
         }
 
+        fingerprintDialog.setCryptoObject(cryptoObject);
+        fingerprintDialog.setReasonForAuthentication(reason);
+        fingerprintDialog.setAuthConfig(authConfig);
+        fingerprintDialog.setDialogCallback(drh);
+        fingerprintDialog.setDialogCallbackError(drh);
         fingerprintDialog.show(activity.getFragmentManager(), FRAGMENT_TAG);
+    }
+
+    @ReactMethod
+    public void cancelAuthentication() {
+        final Activity activity = getCurrentActivity();
+        if (drh != null) {
+            inProgress = false;
+            fingerprintDialog.onCancelled();
+            return;
+        }
     }
 
     private int isFingerprintAuthAvailable() {
